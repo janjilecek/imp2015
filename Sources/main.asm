@@ -68,31 +68,37 @@ _Startup:
             mov #%00010000, PTDD; 
             mov #%00000000, PTED; 
             
-            mov #%00000000, RightDisplayAdr
             
-            mov #jedna, LeftDisplayAdr                        
-            mov #dva, LeftDisplayAdr                        
-            mov #tri, LeftDisplayAdr                        
-            mov #osm, LeftDisplayAdr                        
-            mov #aa, LeftDisplayAdr                        
-            mov #bb, LeftDisplayAdr                        
-            
-            
-            lda #6
+            lda #1
+            sta currentNumber												 	
+            bsr displayNumber	
+            lda #0 ; zvol levy
+            sta currentDisplay	        		   			            
+			bsr displayIt           	
+			
+			lda #10
             sta currentNumber												 	
             bsr displayNumber
-            lda currentNumberSegments
-			sta LeftDisplayAdr
-			            		   			
-            lda #$0B
-            sta currentNumber												 	
-            bsr displayNumber
-            lda currentNumberSegments
-            sta LeftDisplayAdr
+            lda #1 ; zvol pravy
+            sta currentDisplay		        		   			            
+			bsr displayIt           	
+            
 			            	   	
             jmp mainLoop
             
-                         
+displayIt:
+			lda #0	  
+			cmp currentDisplay
+			bne zobrazNaPravem           	
+zobrazNaLevem:
+			lda currentNumberSegments
+			sta LeftDisplayAdr									
+			jmp konecZobrazovani
+zobrazNaPravem:           		
+			lda currentNumberSegments
+            sta RightDisplayAdr
+konecZobrazovani:                          			
+			rts                         
 
 mainLoop:
             ; Insert your code here
@@ -105,10 +111,12 @@ displayNumber:
 			lda #0
             cmp currentNumber
             beq zobrazNula
+			
 				
 			lda #1
             cmp currentNumber
             beq zobrazJedna
+			
 
 			lda #2
             cmp currentNumber
