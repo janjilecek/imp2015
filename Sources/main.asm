@@ -19,7 +19,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  0
+CNT:  dc.w  255
 CN: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
@@ -74,30 +74,24 @@ _Startup:
             mov #%00000000, PTED; 
             
             bsr loadNibbles
-            ;bsr zvysCNT
-            ;bsr zvysCNT
-            ;bsr zvysCNT
-            ;bsr snizCNT
             bsr snizCNT
             
             
-           ;; lda #1
-         ;;   sta currentNumber												 	
-          ;;  bsr displayNumber	
-         ;;   lda #0 ; zvol levy
-        ;;    sta currentDisplay	        		   			            
-	;;		bsr displayIt           	
+      lda bPrvniNibble
+      sta currentNumber												 	
+      bsr displayNumber	
+      lda #0 ; zvol levy
+      sta currentDisplay	        		   			            
+			bsr displayIt           	
 			
-	;;		lda #10
-   ;;         sta currentNumber												 	
-     ;;       bsr displayNumber
-     ;;       lda #1 ; zvol pravy
-    ;;        sta currentDisplay		        		   			            
-	;;		bsr displayIt           	
-    ;        
-		
-
-            jmp mainLoop
+			lda bCtvrtyNibble
+      sta currentNumber												 	
+      bsr displayNumber
+      lda #1 ; zvol pravy
+      sta currentDisplay		        		   			            
+	  	bsr displayIt
+	  	
+	  	jmp mainLoop
             
 displayIt:
 			lda #0	  
@@ -151,17 +145,10 @@ zvysCNT:
             rts
 snizCNT:
             ldhx CNT
-            aix #255
+            aix #-1
             sthx CNT  
             rts        
-znegujHX:
-            negx
-            sthx myH
-            lda myH
-            nega
-            sta myH
-            sthx myH
-            rts
+
 mainLoop:
             ; Insert your code here
             NOP
