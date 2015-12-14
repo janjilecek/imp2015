@@ -94,9 +94,7 @@ _Startup:
 	  	lda #2
 	  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
 	  	; clks na 0b00, rtcps na 0b1000
-	    displayNumber:
-	        jsr displayNumberDef
-	        rts 	
+	    
 	  	;mov #%00, RTCSC_RTCLKS0
 	  	
 	  
@@ -104,17 +102,20 @@ _Startup:
 	  	
 	  	jmp mainLoop
 ; konec inicializacni casti
-; dopredne deklarace
-
-; konec dopredne deklarace
-; odtud definice            
-
-; rezim set
-rezimSet:
+; blok doprednych deklaraci
+displayNumber:
+	        jsr displayNumberDef
+	        rts
+rezimSetDef:
       mov #%00, RTCSC_RTCLKS0
       
       
-      jmp rezimSet
+      jmp rezimSetDef
+; konec bloku doprednych deklaraci
+; odtud definice            
+
+; rezim set
+
 
 
 displayIt:
