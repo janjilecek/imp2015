@@ -19,8 +19,14 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  0
+CNT:  dc.w  65533
 CN: ds.w 1
+myH: ds.b 1
+myX: ds.b 1
+bPrvniNibble: ds.b 1
+bDruhyNibble: ds.b 1
+bTretiNibble: ds.b 1
+bCtvrtyNibble: ds.b 1
 currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
@@ -59,7 +65,6 @@ _Startup:
             clra
             sta SOPT1 ; zastaveni watchdogu
             
-            
             mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
             mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
             mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
@@ -68,7 +73,7 @@ _Startup:
             mov #%00010000, PTDD; 
             mov #%00000000, PTED; 
             
-            
+            bsr loadNibbles
             lda #1
             sta currentNumber												 	
             bsr displayNumber	
@@ -83,7 +88,8 @@ _Startup:
             sta currentDisplay		        		   			            
 			bsr displayIt           	
             
-			            	   	
+		
+
             jmp mainLoop
             
 displayIt:
@@ -99,6 +105,37 @@ zobrazNaPravem:
             sta RightDisplayAdr
 konecZobrazovani:                          			
 			rts                         
+
+loadNibbles:
+            ldhx CNT
+            sthx myH
+            ;; CNT je v myH a myX
+            ;; ulozeni prvniho nibble
+            lda myH
+            and #%11110000
+            lsra
+            lsra
+            lsra
+            lsra
+            sta bPrvniNibble
+            ;; ulozeni druheho nibble
+            lda myH
+            and #%00001111
+            sta bDruhyNibble
+            ;; ulozeni tretiho nibble
+            lda myX       
+            and #%11110000
+            lsra
+            lsra
+            lsra
+            lsra
+            sta bTretiNibble
+            ;; ulozeni ctvrteho nibble                 
+            lda myX
+            and #%00001111
+            sta bCtvrtyNibble
+            
+            rts
 
 mainLoop:
             ; Insert your code here
