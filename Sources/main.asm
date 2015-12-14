@@ -91,8 +91,32 @@ _Startup:
       sta currentDisplay		        		   			            
 	  	bsr displayIt
 	  	
+	  	lda #2
+	  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
+	  	; clks na 0b00, rtcps na 0b1000
+	    displayNumber:
+	        jsr displayNumberDef
+	        rts 	
+	  	;mov #%00, RTCSC_RTCLKS0
+	  	
+	  
+	  	
+	  	
 	  	jmp mainLoop
-            
+; konec inicializacni casti
+; dopredne deklarace
+
+; konec dopredne deklarace
+; odtud definice            
+
+; rezim set
+rezimSet:
+      mov #%00, RTCSC_RTCLKS0
+      
+      
+      jmp rezimSet
+
+
 displayIt:
 			lda #0	  
 			cmp currentDisplay
@@ -152,11 +176,15 @@ snizCNT:
 mainLoop:
             ; Insert your code here
             NOP
-
+            ; otestovani dvou bitu na RTCLKS ; strana 217
+            ; v initu enable RTIE
+            ;while RTIF
+            ; blikni
+            ; nastav ...
             feed_watchdog
             BRA    mainLoop
             
-displayNumber:
+displayNumberDef:
 			lda #0
             cmp currentNumber
             beq zobrazNula
