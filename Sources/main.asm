@@ -19,7 +19,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  65533
+CNT:  dc.w  65534
 CN: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
@@ -74,6 +74,11 @@ _Startup:
             mov #%00000000, PTED; 
             
             bsr loadNibbles
+            bsr zvysCNT
+            bsr zvysCNT
+            bsr zvysCNT
+            
+            
             lda #1
             sta currentNumber												 	
             bsr displayNumber	
@@ -135,6 +140,12 @@ loadNibbles:
             and #%00001111
             sta bCtvrtyNibble
             
+            rts
+
+zvysCNT:
+            ldhx CNT
+            aix #1
+            sthx CNT
             rts
 
 mainLoop:
