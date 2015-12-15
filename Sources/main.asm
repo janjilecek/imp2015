@@ -19,7 +19,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  255
+CNT:  dc.w  0
 CN: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
@@ -33,6 +33,7 @@ currentNumberSegments: dc.b 0
 LeftDisplayAdr: equ 2
 RightDisplayAdr: equ 6
 DILSwitchAdr: equ 8
+RTCClockSetting: equ %00011100 ; nastaveno na 16ms, cca 10x pomalejsi v realite
 nula: equ $3F ; zacatek stavove tabulky
 jedna: equ $06                      
 dva: equ $5B
@@ -109,7 +110,7 @@ displayNumber:
 	        rts
 ; rezim set	        
 rezimSetDef:
-      mov #%00011101, RTCSC
+      mov #RTCClockSetting, RTCSC
 
       ;cli    
       rts
@@ -141,7 +142,9 @@ clockInterruptService:
       sta currentDisplay		        		   			            
 	  	jsr displayIt
 	  	
-	  	
+      ;mov #%00011101, RTCSC	
+      mov #RTCClockSetting, RTCSC
+      ;mov #%0, RTCSC_RTIF  	
       rti
 
 displayIt:
