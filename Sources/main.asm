@@ -60,7 +60,7 @@ ff: equ $71
 _Startup:
             LDHX   #RAMEnd+1        ; initialize the stack pointer
             TXS
-            CLI                     ; enable interrupts
+            ;cli                     ; enable interrupts
             
             clra
             sta SOPT1 ; zastaveni watchdogu
@@ -73,32 +73,33 @@ _Startup:
             mov #%00010000, PTDD; 
             mov #%00000000, PTED; 
             
-            bsr loadNibbles
-            bsr snizCNT
+            jsr loadNibbles
+            jsr snizCNT
             
             
       lda bPrvniNibble
       sta currentNumber												 	
-      bsr displayNumber	
+      jsr displayNumber	
       lda #0 ; zvol levy
       sta currentDisplay	        		   			            
-			bsr displayIt           	
+			jsr displayIt           	
 			
 			lda bCtvrtyNibble
       sta currentNumber												 	
-      bsr displayNumber
+      jsr displayNumber
       lda #1 ; zvol pravy
       sta currentDisplay		        		   			            
-	  	bsr displayIt
+	  	jsr displayIt
 	  	
 	  	lda #2
 	  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
 	  	; clks na 0b00, rtcps na 0b1000
 	    
 	  	;mov #%00, RTCSC_RTCLKS0
-	  	
 	  
-	  	
+	    cli	
+	    jsr rezimSetDef
+	  
 	  	
 	  	jmp mainLoop
 ; konec inicializacni casti
@@ -106,17 +107,42 @@ _Startup:
 displayNumber:
 	        jsr displayNumberDef
 	        rts
+; rezim set	        
 rezimSetDef:
-      mov #%00, RTCSC_RTCLKS0
-      
-      
-      jmp rezimSetDef
+      mov #%00011101, RTCSC
+
+      ;cli    
+      rts
+      ;jmp rezimSetDef
 ; konec bloku doprednych deklaraci
 ; odtud definice            
 
-; rezim set
 
 
+clockInterruptService:
+     ; lda RTCSC      ; preruseni kazdou sekundu
+      ;ora #$80
+      ;sta RTCSC
+      jsr zvysCNT
+      
+      jsr loadNibbles
+      
+      lda bTretiNibble
+      sta currentNumber												 	
+      jsr displayNumber	
+      lda #0 ; zvol levy
+      sta currentDisplay	        		   			            
+			jsr displayIt       
+      
+      lda bCtvrtyNibble
+      sta currentNumber												 	
+      jsr displayNumber
+      lda #1 ; zvol pravy
+      sta currentDisplay		        		   			            
+	  	jsr displayIt
+	  	
+	  	
+      rti
 
 displayIt:
 			lda #0	  
@@ -174,15 +200,20 @@ snizCNT:
             sthx CNT  
             rts        
 
+        
 mainLoop:
             ; Insert your code here
             NOP
+            
+            
+                        
+            wait
             ; otestovani dvou bitu na RTCLKS ; strana 217
             ; v initu enable RTIE
             ;while RTIF
             ; blikni
             ; nastav ...
-            feed_watchdog
+            ;feed_watchdog
             BRA    mainLoop
             
 displayNumberDef:
@@ -381,19 +412,46 @@ d1:
           ais #4
           rts
                                         
-;**************************************************************
-;* spurious - Spurious Interrupt Service Routine.             *
-;*             (unwanted interrupt)                           *
-;**************************************************************
-spurious:                           ; placed here so that security value
-            NOP                     ; does not change all the time.
-            RTI
+
+spurious:   ; telo obsluhy pro neobsluhovana preruseni
+            nop
+            rti
 
 ;**************************************************************
-;*                 Interrupt Vectors                          *
+;* V. tabulka vektoru preruseni                               *
 ;**************************************************************
-            ORG   $FFFA
 
-            DC.W  spurious          ;
-            DC.W  spurious          ; SWI
-            DC.W  _Startup          ; Reset
+
+            org   $FFC0
+            dc.w  spurious         ;$FFC0
+            dc.w  spurious         ;$FFC2
+            dc.w  clockInterruptService         ;$FFC4
+            dc.w  spurious         ;$FFC6
+            dc.w  spurious         ;$FFC8
+            dc.w  spurious         ;$FFCA
+            dc.w  spurious         ;$FFCC
+            dc.w  spurious         ;$FFCE
+            dc.w  spurious         ;$FFD0
+            dc.w  spurious         ;$FFD2
+            dc.w  spurious         ;$FFD4
+            dc.w  spurious         ;$FFD6
+            dc.w  spurious         ;$FFD8
+            dc.w  spurious         ;$FFDA
+            dc.w  spurious         ;$FFDC
+            dc.w  spurious         ;$FFDE
+            dc.w  spurious         ;$FFE0
+            dc.w  spurious         ;$FFE2
+            dc.w  spurious         ;$FFE4
+            dc.w  spurious         ;$FFE6
+            dc.w  spurious         ;$FFE8
+            dc.w  spurious         ;$FFEA
+            dc.w  spurious         ;$FFEC
+            dc.w  spurious         ;$FFEE
+            dc.w  spurious         ;$FFF0
+            dc.w  spurious         ;$FFF2
+            dc.w  spurious         ;$FFF4
+            dc.w  spurious         ;$FFF6
+            dc.w  spurious         ;$FFF8
+            dc.w  spurious         ;$FFFA
+            dc.w  spurious         ;$FFFC
+            dc.w  _Startup         ;$FFFE              
