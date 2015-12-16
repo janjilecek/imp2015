@@ -19,7 +19,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  17
+CNT:  dc.w  0
 CN: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
@@ -27,6 +27,8 @@ bPrvniNibble: ds.b 1
 bDruhyNibble: ds.b 1
 bTretiNibble: ds.b 1
 bCtvrtyNibble: ds.b 1
+currentNibble: dc.b 0
+currentNibbleValue: dc.b 0
 currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
@@ -79,41 +81,40 @@ _Startup:
       jsr displayTest      
             
          
-  	
-  	lda #2
-  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
-  	; clks na 0b00, rtcps na 0b1000
+      
+      lda #2
+      ;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
+      ; clks na 0b00, rtcps na 0b1000
     
-  	;mov #%00, RTCSC_RTCLKS0
+      ;mov #%00, RTCSC_RTCLKS0
   
       cli  ;povol preruseni
-      ;sei	
-      jsr rezimSetDef
-	  
-	  	
-  	jmp mainLoop
+      ;sei  
+        
+            
+      jmp mainLoop
 ; konec inicializacni casti
 ; blok doprednych deklaraci
 displayTest:
         lda bTretiNibble
-      sta currentNumber												 	
-      jsr displayNumber	
+      sta currentNumber                                                                         
+      jsr displayNumber 
       lda #0 ; zvol levy
-      sta currentDisplay	        		   			            
-	    jsr displayIt           	
-	
-	    lda bCtvrtyNibble
-      sta currentNumber												 	
+      sta currentDisplay                                                      
+          jsr displayIt             
+      
+          lda bCtvrtyNibble
+      sta currentNumber                                                                         
       jsr displayNumber
       lda #1 ; zvol pravy
-      sta currentDisplay		        		   			            
-  	jsr displayIt
-  	rts
+      sta currentDisplay                                                            
+      jsr displayIt
+      rts
 
 displayNumber:
       jsr displayNumberDef
       rts
-; rezim set	        
+; rezim set         
 rezimSetDef:
       mov #RTCClockSetting, RTCSC
     
@@ -135,68 +136,27 @@ rezimStartDef:
 
 
 clockInterruptService:
-      ; lda RTCSC      ; preruseni kazdou sekundu
-      ;ora #$80
-      ;sta RTCSC
       jsr loadNibbles
-	
+      
       mov #RTCClockSetting, RTCSC
       
-      jsr blikniAktivni	
+      jsr blikniAktivni 
       rti
 
 displayIt:
-      lda #0	  
-      cmp currentDisplay
-      bne zobrazNaPravem           	
+      ;lda #0        
+      ;cmp currentDisplay
+      brset 4, PTED, zobrazNaPravem            
 zobrazNaLevem:
       lda currentNumberSegments
-      sta LeftDisplayAdr									
+      sta LeftDisplayAdr                                                      
       jmp konecZobrazovani
-zobrazNaPravem:           		
+zobrazNaPravem:                     
       lda currentNumberSegments
       sta RightDisplayAdr
-konecZobrazovani:                          			
+konecZobrazovani:                                           
       rts                  
 
-rezimCitani:
-      brset 5, PTED, zvysCNT
-      brclr 5, PTED, snizCNT
-
-      
-
-      rts
-
-blikniAktivni:
-      brclr 4, PTED, blikniLevy
-blikniPravy:
-      
-      com PTDDD
-      ;lda PTDD
-      ;and PTDDD
-     ; sta PTDD
-      
-      ;mov PTDD, PTDDD
-      
-      ;mov #%00000000, PTDD
-      mov #%11111111, PTBDD ; kdyz blikam levy, obnovim zobrazeni na pravem
-      jmp konecBlikani
-blikniLevy:
-      com PTBDD
-      ;mov #%00000000, PTBD 
-      mov #%11111111, PTDDD ; vice versa
-konecBlikani:      
-      rts      
-rezimSet:
-      ;jsr blikniAktivni
-      rts
-rezimStart:
-      ; volej z wait
-      ;pseudo brset 6, PTED, wait
-      brclr 6, PTED, rezimSet
-      
-      
-      rts
 
 loadNibbles:
       ldhx CNT
@@ -229,6 +189,129 @@ loadNibbles:
       
       rts
 
+blikniAktivni:
+      brclr 4, PTED, blikniLevy
+blikniPravy:
+      
+      com PTDDD
+      ;lda PTDD
+      ;and PTDDD
+     ; sta PTDD
+      
+      ;mov PTDD, PTDDD
+      
+      ;mov #%00000000, PTDD
+      mov #%11111111, PTBDD ; kdyz blikam levy, obnovim zobrazeni na pravem
+      jmp konecBlikani
+blikniLevy:
+      com PTBDD
+      ;mov #%00000000, PTBD 
+      mov #%11111111, PTDDD ; vice versa
+konecBlikani:      
+      rts 
+          
+      
+zmenHodnotuAktivnihoDispleje:
+      ; currentNibble
+      ; currentNumber
+      
+      ; nacti hodnotu poslednich 4 bitu
+      lda PTED
+      and #%00001111
+      brclr 4, PTED, pracujemeSNibblem
+      ;pracujeme s cislem      
+      sta currentNibbleValue
+      ;TODO nezapomen ho ulozit
+            
+      jmp konecPrace
+pracujemeSNibblem:      
+      sta currentNibble
+
+konecPrace:
+      sta currentNumber
+      jsr displayNumber
+      jsr displayIt
+      
+      ; uloz hodnotu      
+      ldhx CNT
+      sthx myH
+      lda currentNibble
+      cmp #0
+      beq ulozeniPrvniNibble
+      cmp #1
+      beq ulozeniDruhyNibble
+      cmp #2
+      beq ulozeniTretiNibble
+      cmp #3
+      beq ulozeniCtvrtyNibble
+      jmp ulozeniKonec
+ulozeniPrvniNibble:
+      lda myX
+      and #%11110000
+      ora currentNibbleValue
+      sta myX
+      jmp ulozeniKonec
+      
+ulozeniDruhyNibble:
+      lda myX
+      and #%00001111
+      ldx currentNibbleValue
+      lslx
+      lslx
+      lslx
+      lslx
+      stx myX 
+      ora myX
+      sta myX
+      jmp ulozeniKonec
+      
+ulozeniTretiNibble:
+      lda myH
+      and #%11110000
+      ora currentNibbleValue
+      sta myH
+      jmp ulozeniKonec
+ulozeniCtvrtyNibble:
+      lda myH
+      and #%00001111
+      ldx currentNibbleValue
+      lslx
+      lslx
+      lslx
+      lslx
+      stx myH 
+      ora myH
+      sta myH  
+ulozeniKonec:
+      ldhx myH
+      sthx CNT    
+      rts
+rezimCitani:
+      brset 5, PTED, zvysCNT
+      brclr 5, PTED, snizCNT
+
+      
+
+      rts         
+rezimSet:
+      jsr rezimSetDef
+      jsr zmenHodnotuAktivnihoDispleje
+
+      
+      wait
+      
+      
+      
+      rts
+rezimStart:
+      ; volej z wait
+      ;pseudo brset 6, PTED, wait
+      brclr 6, PTED, rezimSet
+      
+      
+      rts
+
+
 rezimStop:
       sei
       mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
@@ -255,15 +338,14 @@ snizCNT:
       rts        
 
 nactiDILSwitch:
-      lda PTED ; v A je hodnota DILSwitche
-      brclr 7, PTED, rezimStop
+      
       brset 7, PTED, rezimSet
+      ;brclr 7, PTED, rezimStop
       rts
-        
+ 
 mainLoop:
             ; Insert your code here
-      NOP
-      
+      NOP     
       ;jsr loadNibbles
       ;jsr displayTest
       jsr nactiDILSwitch            
@@ -271,13 +353,13 @@ mainLoop:
       
       ;feed_watchdog
       BRA    mainLoop
-            
+           
 displayNumberDef:
       lda #0
       cmp currentNumber
       beq zobrazNula
 
-      	
+            
       lda #1
       cmp currentNumber
       beq zobrazJedna
@@ -405,69 +487,7 @@ zobrazF:
       lda #ff
       sta currentNumberSegments
       rts    
-            
-displayNumberOnCurrentDisplay:
-                            
-
-cislo0:
-      mov #%11000000, PTBD 
-      rts
-
-
-;-----------------------------------------------------
-delay_fixed: ; 2 vnorene cykly, kazdy o danem pevnem poctu iteraci
-      psha
-      lda		#$8F
-delay1:
-
-      psha
-      lda		#$60
-delay2:
-
-      nop                     ; doba provadeni = 1 BUS-cyklus
-      nop
-      nop
-      nop
-      nop
-      nop
-      nop
-      nop
-      nop
-      nop
-
-      dbnza	delay2
-      pula
-
-      dbnza	delay1
-      pula
-
-      rts
-
-;-----------------------------------------------------
-delay_var ; 16-bit pocet iteraci je pred volanim vlozen do H:X
-          ; (iterace se pocitaji od 0 az po (2^16)-1)
-      pshx
-      pshh
-      ais #-2                   ; pomocna lokalni 16-bit promenna
-      tsx
-      clr 1,X
-      clr ,X
-      bra d1
-d0:
-      tsx
-      inc 1,X
-      bne d1
-      inc ,X
-d1:
-      nop                       ; "zatez" smycky
-
-      ldhx 3,SP
-      cphx 1,SP
-      bhi d0
-
-      ais #4
-      rts
-                                        
+                                                                     
 
 spurious:   ; telo obsluhy pro neobsluhovana preruseni
       nop
