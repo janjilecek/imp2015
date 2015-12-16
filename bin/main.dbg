@@ -3489,7 +3489,7 @@ currentNumberSegments: dc.b 0
 LeftDisplayAdr: equ 2
 RightDisplayAdr: equ 6
 DILSwitchAdr: equ 8
-RTCClockSetting: equ %00011100
+RTCClockSetting: equ %00011100 ; nastaveno na 16ms, cca 10x pomalejsi v realite
 nula: equ $3F ; zacatek stavove tabulky
 jedna: equ $06                      
 dva: equ $5B
@@ -3515,23 +3515,23 @@ ff: equ $71
 
 
 _Startup:
-            LDHX   #RAMEnd+1        ; initialize the stack pointer
-            TXS
-            ;cli                     ; enable interrupts
-            
-            clra
-            sta SOPT1 ; zastaveni watchdogu
-            
-            mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
-            mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
-            mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
-          
-            mov #%00000000, PTBD; 
-            mov #%00010000, PTDD; 
-            mov #%00000000, PTED; 
-            
-            jsr loadNibbles
-            jsr snizCNT
+      LDHX   #RAMEnd+1        ; initialize the stack pointer
+      TXS
+      ;cli                     ; enable interrupts
+      
+      clra
+      sta SOPT1 ; zastaveni watchdogu
+      
+      mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
+      mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
+      mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
+    
+      mov #%00000000, PTBD; 
+      mov #%00010000, PTDD; 
+      mov #%00000000, PTED; 
+      
+      jsr loadNibbles
+      jsr snizCNT
             
             
       lda bPrvniNibble
@@ -3539,378 +3539,423 @@ _Startup:
       jsr displayNumber	
       lda #0 ; zvol levy
       sta currentDisplay	        		   			            
-			jsr displayIt           	
-			
-			lda bCtvrtyNibble
+	    jsr displayIt           	
+	
+	    lda bCtvrtyNibble
       sta currentNumber												 	
       jsr displayNumber
       lda #1 ; zvol pravy
       sta currentDisplay		        		   			            
-	  	jsr displayIt
-	  	
-	  	lda #2
-	  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
-	  	; clks na 0b00, rtcps na 0b1000
-	    
-	  	;mov #%00, RTCSC_RTCLKS0
+  	jsr displayIt
+  	
+  	lda #2
+  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
+  	; clks na 0b00, rtcps na 0b1000
+    
+  	;mov #%00, RTCSC_RTCLKS0
+  
+      ;cli  ;povol preruseni
+      sei	
+      jsr rezimSetDef
 	  
-	    cli	
-	    jsr rezimSetDef
-	  
 	  	
-	  	jmp mainLoop
+  	jmp mainLoop
 ; konec inicializacni casti
 ; blok doprednych deklaraci
 displayNumber:
-	        jsr displayNumberDef
-	        rts
+      jsr displayNumberDef
+      rts
 ; rezim set	        
 rezimSetDef:
       mov #RTCClockSetting, RTCSC
-
-      ;cli    
+    
       rts
-      ;jmp rezimSetDef
+      
+; rezim Stop      
+rezimStopDef:
+      
+      rts
+
+; rezim Start
+rezimStartDef:
+      jsr rezimStart
+    
+      rts      
 ; konec bloku doprednych deklaraci
 ; odtud definice            
 
 
 
 clockInterruptService:
-     ; lda RTCSC      ; preruseni kazdou sekundu
+      ; lda RTCSC      ; preruseni kazdou sekundu
       ;ora #$80
       ;sta RTCSC
       jsr zvysCNT
-      
+
       jsr loadNibbles
-      
+
       lda bTretiNibble
       sta currentNumber												 	
       jsr displayNumber	
       lda #0 ; zvol levy
       sta currentDisplay	        		   			            
-			jsr displayIt       
-      
+      jsr displayIt       
+
       lda bCtvrtyNibble
       sta currentNumber												 	
       jsr displayNumber
       lda #1 ; zvol pravy
       sta currentDisplay		        		   			            
-	  	jsr displayIt
-	  	
-      ;mov #%00011101, RTCSC	
-      mov #RTCClockSetting, RTCSC
-      ;mov #%0, RTCSC_RTIF  	
+      jsr displayIt
+	
+      mov #RTCClockSetting, RTCSC	
       rti
 
 displayIt:
-			lda #0	  
-			cmp currentDisplay
-			bne zobrazNaPravem           	
+      lda #0	  
+      cmp currentDisplay
+      bne zobrazNaPravem           	
 zobrazNaLevem:
-			lda currentNumberSegments
-			sta LeftDisplayAdr									
-			jmp konecZobrazovani
+      lda currentNumberSegments
+      sta LeftDisplayAdr									
+      jmp konecZobrazovani
 zobrazNaPravem:           		
-			lda currentNumberSegments
-            sta RightDisplayAdr
+      lda currentNumberSegments
+      sta RightDisplayAdr
 konecZobrazovani:                          			
-			rts                         
+      rts                  
+
+rezimCitani:
+      brset 5, PTED, zvysCNT
+      brclr 5, PTED, snizCNT
+
+      
+
+      rts
+
+blikniAktivni:
+      ;ldx #4
+      ;lda PTED, x
+      lda PTED
+      and #%00010000
+      lsra
+      lsra
+      lsra
+      lsra
+      sta currentDisplay
+      
+      rts      
+rezimSet:
+      ; volej z wait
+      ; blikni aktivni
+
+      rts
+rezimStart:
+      ; volej z wait
+      ;pseudo brset 6, PTED, wait
+      brclr 6, PTED, rezimSet
+      
+      
+      rts
 
 loadNibbles:
-            ldhx CNT
-            sthx myH
-            ;; CNT je v myH a myX
-            ;; ulozeni prvniho nibble
-            lda myH
-            and #%11110000
-            lsra
-            lsra
-            lsra
-            lsra
-            sta bPrvniNibble
-            ;; ulozeni druheho nibble
-            lda myH
-            and #%00001111
-            sta bDruhyNibble
-            ;; ulozeni tretiho nibble
-            lda myX       
-            and #%11110000
-            lsra
-            lsra
-            lsra
-            lsra
-            sta bTretiNibble
-            ;; ulozeni ctvrteho nibble                 
-            lda myX
-            and #%00001111
-            sta bCtvrtyNibble
-            
-            rts
+      ldhx CNT
+      sthx myH
+      ;; CNT je v myH a myX
+      ;; ulozeni prvniho nibble
+      lda myH
+      and #%11110000
+      lsra
+      lsra
+      lsra
+      lsra
+      sta bPrvniNibble
+      ;; ulozeni druheho nibble
+      lda myH
+      and #%00001111
+      sta bDruhyNibble
+      ;; ulozeni tretiho nibble
+      lda myX       
+      and #%11110000
+      lsra
+      lsra
+      lsra
+      lsra
+      sta bTretiNibble
+      ;; ulozeni ctvrteho nibble                 
+      lda myX
+      and #%00001111
+      sta bCtvrtyNibble
+      
+      rts
 
 zvysCNT:
-            ldhx CNT
-            aix #1
-            sthx CNT
-            rts
+      ldhx CNT
+      aix #1
+      sthx CNT
+      rts
 snizCNT:
-            ldhx CNT
-            aix #-1
-            sthx CNT  
-            rts        
+      ldhx CNT
+      aix #-1
+      sthx CNT  
+      rts        
 
+nactiDILSwitch:
+      lda PTED ; v A je hodnota DILSwitche
+      brset 7, PTED, rezimStart
+      rts
         
 mainLoop:
             ; Insert your code here
-            NOP
-            
-            
-                        
-            wait
-            ; otestovani dvou bitu na RTCLKS ; strana 217
-            ; v initu enable RTIE
-            ;while RTIF
-            ; blikni
-            ; nastav ...
-            ;feed_watchdog
-            BRA    mainLoop
+      NOP
+      
+      jsr nactiDILSwitch
+      jsr blikniAktivni            
+      ;wait
+      ; otestovani dvou bitu na RTCLKS ; strana 217
+      ; v initu enable RTIE
+      ;while RTIF
+      ; blikni
+      ; nastav ...
+      ;feed_watchdog
+      BRA    mainLoop
             
 displayNumberDef:
-			lda #0
-            cmp currentNumber
-            beq zobrazNula
-			
-				
-			lda #1
-            cmp currentNumber
-            beq zobrazJedna
-			
+      lda #0
+      cmp currentNumber
+      beq zobrazNula
 
-			lda #2
-            cmp currentNumber
-            beq zobrazDva
-            
-			lda #3
-            cmp currentNumber
-            beq zobrazTri
-            
-			lda #4
-            cmp currentNumber
-            beq zobrazCtyri
-            
-			lda #5
-            cmp currentNumber
-            beq zobrazPet
-            
-			lda #6
-            cmp currentNumber
-            beq zobrazSest
-            
-			lda #7
-            cmp currentNumber
-            beq zobrazSedm
-            
-			lda #8
-            cmp currentNumber
-            beq zobrazOsm
-            
-			lda #9
-            cmp currentNumber
-            beq zobrazDevet
-            
-			lda #10
-            cmp currentNumber
-            beq zobrazA
-            
-			lda #11
-            cmp currentNumber
-            beq zobrazB
-            
-			lda #12
-            cmp currentNumber
-            beq zobrazC
-            
-			lda #13
-            cmp currentNumber
-            beq zobrazD
-            
-			lda #14
-            cmp currentNumber
-            beq zobrazE
-            
-			lda #15
-            cmp currentNumber
-            beq zobrazF
-            
-            rts
+      	
+      lda #1
+      cmp currentNumber
+      beq zobrazJedna
+
+
+      lda #2
+      cmp currentNumber
+      beq zobrazDva
+
+      lda #3
+      cmp currentNumber
+      beq zobrazTri
+
+      lda #4
+      cmp currentNumber
+      beq zobrazCtyri
+
+      lda #5
+      cmp currentNumber
+      beq zobrazPet
+
+      lda #6
+      cmp currentNumber
+      beq zobrazSest
+
+      lda #7
+      cmp currentNumber
+      beq zobrazSedm
+
+      lda #8
+      cmp currentNumber
+      beq zobrazOsm
+
+      lda #9
+      cmp currentNumber
+      beq zobrazDevet
+
+      lda #10
+      cmp currentNumber
+      beq zobrazA
+
+      lda #11
+      cmp currentNumber
+      beq zobrazB
+
+      lda #12
+      cmp currentNumber
+      beq zobrazC
+
+      lda #13
+      cmp currentNumber
+      beq zobrazD
+
+      lda #14
+      cmp currentNumber
+      beq zobrazE
+
+      lda #15
+      cmp currentNumber
+      beq zobrazF
+
+      rts
             
 zobrazNula:
-            lda #nula
-            sta currentNumberSegments
-            rts                        
+      lda #nula
+      sta currentNumberSegments
+      rts                        
 zobrazJedna:
-            lda #jedna
-            sta currentNumberSegments
-            rts 
+      lda #jedna
+      sta currentNumberSegments
+      rts 
 zobrazDva:
-            lda #dva
-            sta currentNumberSegments
-            rts 
+      lda #dva
+      sta currentNumberSegments
+      rts 
 zobrazTri:
-            lda #tri
-            sta currentNumberSegments
-            rts 
+      lda #tri
+      sta currentNumberSegments
+      rts 
 zobrazCtyri:
-            lda #ctyri
-            sta currentNumberSegments
-            rts 
+      lda #ctyri
+      sta currentNumberSegments
+      rts 
 zobrazPet:
-            lda #pet
-            sta currentNumberSegments
-            rts 
+      lda #pet
+      sta currentNumberSegments
+      rts 
 zobrazSest:
-            lda #sest
-            sta currentNumberSegments
-            rts 
+      lda #sest
+      sta currentNumberSegments
+      rts 
 zobrazSedm:
-            lda #sedm
-            sta currentNumberSegments
-            rts 
+      lda #sedm
+      sta currentNumberSegments
+      rts 
 zobrazOsm:
-            lda #osm
-            sta currentNumberSegments
-            rts 
+      lda #osm
+      sta currentNumberSegments
+      rts 
 zobrazDevet:
-            lda #devet
-            sta currentNumberSegments
-            rts 
+      lda #devet
+      sta currentNumberSegments
+      rts 
 zobrazA:
-            lda #aa
-            sta currentNumberSegments
-            rts 
+      lda #aa
+      sta currentNumberSegments
+      rts 
 zobrazB:
-            lda #bb
-            sta currentNumberSegments
-            rts 
+      lda #bb
+      sta currentNumberSegments
+      rts 
 zobrazC:
-            lda #cc
-            sta currentNumberSegments
-            rts 
+      lda #cc
+      sta currentNumberSegments
+      rts 
 zobrazD:
-            lda #dd
-            sta currentNumberSegments
-            rts 
+      lda #dd
+      sta currentNumberSegments
+      rts 
 zobrazE:
-            lda #ee
-            sta currentNumberSegments
-            rts 
+      lda #ee
+      sta currentNumberSegments
+      rts 
 zobrazF:
-            lda #ff
-            sta currentNumberSegments
-            rts    
+      lda #ff
+      sta currentNumberSegments
+      rts    
             
 displayNumberOnCurrentDisplay:
                             
 
 cislo0:
-            mov #%11000000, PTBD 
-            rts
+      mov #%11000000, PTBD 
+      rts
 
 
 ;-----------------------------------------------------
 delay_fixed: ; 2 vnorene cykly, kazdy o danem pevnem poctu iteraci
-	          psha
-	          lda		#$8F
+      psha
+      lda		#$8F
 delay1:
 
-		        psha
-		        lda		#$60
+      psha
+      lda		#$60
 delay2:
 
-		        nop                     ; doba provadeni = 1 BUS-cyklus
-		        nop
-		        nop
-		        nop
-		        nop
-		        nop
-		        nop
-		        nop
-		        nop
-		        nop
+      nop                     ; doba provadeni = 1 BUS-cyklus
+      nop
+      nop
+      nop
+      nop
+      nop
+      nop
+      nop
+      nop
+      nop
 
-		        dbnza	delay2
-		        pula
+      dbnza	delay2
+      pula
 
-		        dbnza	delay1
-		        pula
+      dbnza	delay1
+      pula
 
-		        rts
+      rts
 
 ;-----------------------------------------------------
 delay_var ; 16-bit pocet iteraci je pred volanim vlozen do H:X
           ; (iterace se pocitaji od 0 az po (2^16)-1)
-          pshx
-          pshh
-          ais #-2                   ; pomocna lokalni 16-bit promenna
-          tsx
-          clr 1,X
-          clr ,X
-          bra d1
+      pshx
+      pshh
+      ais #-2                   ; pomocna lokalni 16-bit promenna
+      tsx
+      clr 1,X
+      clr ,X
+      bra d1
 d0:
-          tsx
-          inc 1,X
-          bne d1
-          inc ,X
+      tsx
+      inc 1,X
+      bne d1
+      inc ,X
 d1:
-          nop                       ; "zatez" smycky
-          
-          ldhx 3,SP
-          cphx 1,SP
-          bhi d0
-          
-          ais #4
-          rts
+      nop                       ; "zatez" smycky
+
+      ldhx 3,SP
+      cphx 1,SP
+      bhi d0
+
+      ais #4
+      rts
                                         
 
 spurious:   ; telo obsluhy pro neobsluhovana preruseni
-            nop
-            rti
+      nop
+      rti
 
 ;**************************************************************
 ;* V. tabulka vektoru preruseni                               *
 ;**************************************************************
 
 
-            org   $FFC0
-            dc.w  spurious         ;$FFC0
-            dc.w  spurious         ;$FFC2
-            dc.w  clockInterruptService         ;$FFC4
-            dc.w  spurious         ;$FFC6
-            dc.w  spurious         ;$FFC8
-            dc.w  spurious         ;$FFCA
-            dc.w  spurious         ;$FFCC
-            dc.w  spurious         ;$FFCE
-            dc.w  spurious         ;$FFD0
-            dc.w  spurious         ;$FFD2
-            dc.w  spurious         ;$FFD4
-            dc.w  spurious         ;$FFD6
-            dc.w  spurious         ;$FFD8
-            dc.w  spurious         ;$FFDA
-            dc.w  spurious         ;$FFDC
-            dc.w  spurious         ;$FFDE
-            dc.w  spurious         ;$FFE0
-            dc.w  spurious         ;$FFE2
-            dc.w  spurious         ;$FFE4
-            dc.w  spurious         ;$FFE6
-            dc.w  spurious         ;$FFE8
-            dc.w  spurious         ;$FFEA
-            dc.w  spurious         ;$FFEC
-            dc.w  spurious         ;$FFEE
-            dc.w  spurious         ;$FFF0
-            dc.w  spurious         ;$FFF2
-            dc.w  spurious         ;$FFF4
-            dc.w  spurious         ;$FFF6
-            dc.w  spurious         ;$FFF8
-            dc.w  spurious         ;$FFFA
-            dc.w  spurious         ;$FFFC
-            dc.w  _Startup         ;$FFFE              
+      org   $FFC0
+      dc.w  spurious         ;$FFC0
+      dc.w  spurious         ;$FFC2
+      dc.w  clockInterruptService         ;$FFC4
+      dc.w  spurious         ;$FFC6
+      dc.w  spurious         ;$FFC8
+      dc.w  spurious         ;$FFCA
+      dc.w  spurious         ;$FFCC
+      dc.w  spurious         ;$FFCE
+      dc.w  spurious         ;$FFD0
+      dc.w  spurious         ;$FFD2
+      dc.w  spurious         ;$FFD4
+      dc.w  spurious         ;$FFD6
+      dc.w  spurious         ;$FFD8
+      dc.w  spurious         ;$FFDA
+      dc.w  spurious         ;$FFDC
+      dc.w  spurious         ;$FFDE
+      dc.w  spurious         ;$FFE0
+      dc.w  spurious         ;$FFE2
+      dc.w  spurious         ;$FFE4
+      dc.w  spurious         ;$FFE6
+      dc.w  spurious         ;$FFE8
+      dc.w  spurious         ;$FFEA
+      dc.w  spurious         ;$FFEC
+      dc.w  spurious         ;$FFEE
+      dc.w  spurious         ;$FFF0
+      dc.w  spurious         ;$FFF2
+      dc.w  spurious         ;$FFF4
+      dc.w  spurious         ;$FFF6
+      dc.w  spurious         ;$FFF8
+      dc.w  spurious         ;$FFFA
+      dc.w  spurious         ;$FFFC
+      dc.w  _Startup         ;$FFFE              
