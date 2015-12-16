@@ -142,7 +142,7 @@ clockInterruptService:
 	
       mov #RTCClockSetting, RTCSC
       
-      jsr rezimSet	
+      jsr blikniAktivni	
       rti
 
 displayIt:
@@ -188,9 +188,7 @@ blikniLevy:
 konecBlikani:      
       rts      
 rezimSet:
-      ; volej z wait
-      ; blikni aktivni
-      jsr blikniAktivni
+      ;jsr blikniAktivni
       rts
 rezimStart:
       ; volej z wait
@@ -231,6 +229,20 @@ loadNibbles:
       
       rts
 
+rezimStop:
+      sei
+      mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
+      mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
+      mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
+    
+      mov #%00000000, PTBD; 
+      mov #%00000000, PTDD; 
+      mov #%00000000, PTED; 
+      mov #0, RTCSC
+      ldhx #0
+      sthx CNT
+      rts
+
 zvysCNT:
       ldhx CNT
       aix #1
@@ -244,17 +256,18 @@ snizCNT:
 
 nactiDILSwitch:
       lda PTED ; v A je hodnota DILSwitche
-      brset 7, PTED, rezimStart
+      brclr 7, PTED, rezimStop
+      brset 7, PTED, rezimSet
       rts
         
 mainLoop:
             ; Insert your code here
       NOP
       
-      jsr loadNibbles
-      jsr displayTest
+      ;jsr loadNibbles
+      ;jsr displayTest
       jsr nactiDILSwitch            
-      wait
+;      wait
       
       ;feed_watchdog
       BRA    mainLoop
