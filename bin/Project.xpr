@@ -1,1 +1,2 @@
 Data < ADDXPR ONLY_ADD_IF_NEW "main.dbg::CNT"
+Data < ADDXPR ONLY_ADD_IF_NEW "main.dbg::CN"

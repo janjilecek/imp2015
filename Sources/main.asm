@@ -21,6 +21,7 @@
             ORG    RAMStart         ; Insert your data definition here
 CNT:  dc.w  0
 CN: ds.w 1
+compareCNT: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
 bPrvniNibble: ds.b 1
@@ -32,10 +33,13 @@ currentNibbleValue: dc.b 0
 currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
+tempChangingH: ds.b 1
+tempChangingX: ds.b 1
+fastestChanging: ds.b 1
 LeftDisplayAdr: equ 2
 RightDisplayAdr: equ 6
 DILSwitchAdr: equ 8
-RTCClockSetting: equ %00011100 ; nastaveno na 16ms, cca 10x pomalejsi v realite
+RTCClockSetting: equ %00011100 ; 1100 nastaveno na 16ms, cca 10x pomalejsi v realite
 nula: equ $3F ; zacatek stavove tabulky
 jedna: equ $06                      
 dva: equ $5B
@@ -191,38 +195,24 @@ loadNibbles:
 
 blikniAktivni:
       brclr 4, PTED, blikniLevy
-blikniPravy:
-      
+blikniPravy:      
       com PTDDD
-      ;lda PTDD
-      ;and PTDDD
-     ; sta PTDD
-      
-      ;mov PTDD, PTDDD
-      
-      ;mov #%00000000, PTDD
       mov #%11111111, PTBDD ; kdyz blikam levy, obnovim zobrazeni na pravem
       jmp konecBlikani
 blikniLevy:
       com PTBDD
-      ;mov #%00000000, PTBD 
       mov #%11111111, PTDDD ; vice versa
 konecBlikani:      
       rts 
           
       
-zmenHodnotuAktivnihoDispleje:
-      ; currentNibble
-      ; currentNumber
-      
+zmenHodnotuAktivnihoDispleje:      
       ; nacti hodnotu poslednich 4 bitu
       lda PTED
       and #%00001111
       brclr 4, PTED, pracujemeSNibblem
-      ;pracujeme s cislem      
-      sta currentNibbleValue
-      ;TODO nezapomen ho ulozit
-            
+;pracujeme s cislem      
+      sta currentNibbleValue        
       jmp konecPrace
 pracujemeSNibblem:      
       sta currentNibble
@@ -286,13 +276,59 @@ ulozeniKonec:
       ldhx myH
       sthx CNT    
       rts
-rezimCitani:
-      brset 5, PTED, zvysCNT
-      brclr 5, PTED, snizCNT
-
       
+      
+rezimCitani:
+      jsr rezimSetDef
+      lda #255
+loopNop:
+      nop
+      deca
+      cmp #0
+      bne loopNop ; zpomaleni
+      
+      ldhx CNT
+      sthx compareCNT
 
-      rts         
+      brset 5, PTED, zvyseniCNT
+      brclr 5, PTED, snizeniCNT
+
+zvyseniCNT:
+      jsr zvysCNT
+      jmp dontknowCNT
+snizeniCNT:
+      jsr snizCNT
+dontknowCNT:
+      
+      ldhx CNT
+      sthx myH
+      ; mam myH horni, myX dolni
+      ldhx compareCNT
+      sthx tempChangingH
+      ; stare hodnoty CNT v tempChangingH, tempChangingX
+      lda myH
+      eor tempChangingH
+      cmp #0 ; pokud se v H neco zmenilo
+      bne otestujNibblyVH
+      lda myX
+      eor tempChangingX
+      ; testuji nibbly v X
+      ; TODO zitra
+      ; otestuj nibbly
+      ; zobraz nejrychleji se menici se 
+      ; consider doing this in the interruption
+      
+      jmp konecTestovaniCitani            
+otestujNibblyVH:
+            
+konecTestovaniCitani:            
+      wait
+
+      rts 
+      
+trikratBlikniAZastav:
+
+  rts        
 rezimSet:
       jsr rezimSetDef
       jsr zmenHodnotuAktivnihoDispleje
@@ -304,10 +340,8 @@ rezimSet:
       
       rts
 rezimStart:
-      ; volej z wait
-      ;pseudo brset 6, PTED, wait
-      brclr 6, PTED, rezimSet
-      
+      brclr 6, PTED, rezimSet ; sprav na jsr 
+      brset 6, PTED, rezimCitani
       
       rts
 
@@ -328,18 +362,22 @@ rezimStop:
 
 zvysCNT:
       ldhx CNT
+      cphx #$FFFF
+      beq trikratBlikniAZastav
       aix #1
       sthx CNT
       rts
 snizCNT:
       ldhx CNT
+      cphx #$0000
+      beq trikratBlikniAZastav
       aix #-1
       sthx CNT  
       rts        
 
 nactiDILSwitch:
       
-      brset 7, PTED, rezimSet
+      brset 7, PTED, rezimStart
       ;brclr 7, PTED, rezimStop
       rts
  
