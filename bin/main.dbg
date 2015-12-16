@@ -3475,7 +3475,7 @@ feed_watchdog: MACRO
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  0
+CNT:  dc.w  17
 CN: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
@@ -3527,14 +3527,31 @@ _Startup:
       mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
     
       mov #%00000000, PTBD; 
-      mov #%00010000, PTDD; 
+      mov #%00000000, PTDD; 
       mov #%00000000, PTED; 
       
       jsr loadNibbles
-      jsr snizCNT
+      
+      jsr displayTest      
             
-            
-      lda bPrvniNibble
+         
+  	
+  	lda #2
+  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
+  	; clks na 0b00, rtcps na 0b1000
+    
+  	;mov #%00, RTCSC_RTCLKS0
+  
+      cli  ;povol preruseni
+      ;sei	
+      jsr rezimSetDef
+	  
+	  	
+  	jmp mainLoop
+; konec inicializacni casti
+; blok doprednych deklaraci
+displayTest:
+        lda bTretiNibble
       sta currentNumber												 	
       jsr displayNumber	
       lda #0 ; zvol levy
@@ -3547,21 +3564,8 @@ _Startup:
       lda #1 ; zvol pravy
       sta currentDisplay		        		   			            
   	jsr displayIt
-  	
-  	lda #2
-  	;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
-  	; clks na 0b00, rtcps na 0b1000
-    
-  	;mov #%00, RTCSC_RTCLKS0
-  
-      ;cli  ;povol preruseni
-      sei	
-      jsr rezimSetDef
-	  
-	  	
-  	jmp mainLoop
-; konec inicializacni casti
-; blok doprednych deklaraci
+  	rts
+
 displayNumber:
       jsr displayNumberDef
       rts
@@ -3590,25 +3594,11 @@ clockInterruptService:
       ; lda RTCSC      ; preruseni kazdou sekundu
       ;ora #$80
       ;sta RTCSC
-      jsr zvysCNT
-
       jsr loadNibbles
-
-      lda bTretiNibble
-      sta currentNumber												 	
-      jsr displayNumber	
-      lda #0 ; zvol levy
-      sta currentDisplay	        		   			            
-      jsr displayIt       
-
-      lda bCtvrtyNibble
-      sta currentNumber												 	
-      jsr displayNumber
-      lda #1 ; zvol pravy
-      sta currentDisplay		        		   			            
-      jsr displayIt
 	
-      mov #RTCClockSetting, RTCSC	
+      mov #RTCClockSetting, RTCSC
+      
+      jsr rezimSet	
       rti
 
 displayIt:
@@ -3634,21 +3624,29 @@ rezimCitani:
       rts
 
 blikniAktivni:
-      ;ldx #4
-      ;lda PTED, x
-      lda PTED
-      and #%00010000
-      lsra
-      lsra
-      lsra
-      lsra
-      sta currentDisplay
+      brclr 4, PTED, blikniLevy
+blikniPravy:
       
+      com PTDDD
+      ;lda PTDD
+      ;and PTDDD
+     ; sta PTDD
+      
+      ;mov PTDD, PTDDD
+      
+      ;mov #%00000000, PTDD
+      mov #%11111111, PTBDD ; kdyz blikam levy, obnovim zobrazeni na pravem
+      jmp konecBlikani
+blikniLevy:
+      com PTBDD
+      ;mov #%00000000, PTBD 
+      mov #%11111111, PTDDD ; vice versa
+konecBlikani:      
       rts      
 rezimSet:
       ; volej z wait
       ; blikni aktivni
-
+      jsr blikniAktivni
       rts
 rezimStart:
       ; volej z wait
@@ -3709,14 +3707,11 @@ mainLoop:
             ; Insert your code here
       NOP
       
-      jsr nactiDILSwitch
-      jsr blikniAktivni            
-      ;wait
-      ; otestovani dvou bitu na RTCLKS ; strana 217
-      ; v initu enable RTIE
-      ;while RTIF
-      ; blikni
-      ; nastav ...
+      jsr loadNibbles
+      jsr displayTest
+      jsr nactiDILSwitch            
+      wait
+      
       ;feed_watchdog
       BRA    mainLoop
             
