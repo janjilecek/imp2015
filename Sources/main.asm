@@ -33,6 +33,7 @@ currentNibbleValue: dc.b 0
 currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
+tempByte: ds.b 1
 tempChangingH: ds.b 1
 tempChangingX: ds.b 1
 fastestChanging: ds.b 1
@@ -308,22 +309,78 @@ dontknowCNT:
       ; stare hodnoty CNT v tempChangingH, tempChangingX
       lda myH
       eor tempChangingH
-      cmp #0 ; pokud se v H neco zmenilo
-      bne otestujNibblyVH
+      sta myH
       lda myX
       eor tempChangingX
-      ; testuji nibbly v X
-      ; TODO zitra
-      ; otestuj nibbly
-      ; zobraz nejrychleji se menici se 
-      ; consider doing this in the interruption
-      
-      jmp konecTestovaniCitani            
-otestujNibblyVH:
-            
-konecTestovaniCitani:            
-      wait
+      sta myX
+      ldhx myH ; do HX uloz XOR verzi
+      sthx compareCNT ; zazalohuj
+      ; cmp myH, if > F, 4.n, mensi je 3. n
+      ; cmp myX, if > F, 2.n, mensi je 1. n
+      lda #0
+      cmp myH
+      beq testLowerX ; zadna zmena v H, jdeme do X
+      lda #$0F
+      cmp myH
+      blo aktivniCtvrtyNibble
+aktivniTretiNibble:                  
+      lda #2
+      sta fastestChanging
+      jmp testLowerX
+aktivniCtvrtyNibble:
+      lda #3
+      sta fastestChanging
+testLowerX:
+      lda #$0F
+      cmp myX
+      blo aktivniDruhyNibble
+aktivniPrvniNibble:
+      lda #0
+      sta fastestChanging
+      jmp konecTestovaniCitani
+aktivniDruhyNibble:
+      lda #1
+      sta fastestChanging 
+konecTestovaniCitani: 
+      ; nyni zobraz na displeji
+      jsr loadNibbles
+      lda fastestChanging ; nacteni nibble indexu 
+      sta currentNumber   ; do currentNumber
+      jsr displayNumberDef; zjisteni segmentu
+      lda currentNumberSegments  ; nacteni segmentu
+      sta LeftDisplayAdr   ; ulozeni na levy displej                                                   
+      ;jmp konecZobrazovani
 
+      ;lda currentNumberSegments
+      ;sta RightDisplayAdr
+
+      lda fastestChanging
+      cmp #0 ; pokud prvni
+      beq ulozPrvniN
+      cmp #1
+      beq ulozDruhyN
+      cmp #2
+      beq ulozTretiN
+      cmp #3
+      beq ulozCtvrtyN
+      jmp ulozPrvniN ; osetreni
+ulozPrvniN:
+      lda bCtvrtyNibble
+      jmp zobrazHodnotuNibble
+ulozDruhyN:
+      lda bTretiNibble
+      jmp zobrazHodnotuNibble
+ulozTretiN:
+      lda bDruhyNibble
+      jmp zobrazHodnotuNibble
+ulozCtvrtyN:      
+      lda bPrvniNibble
+zobrazHodnotuNibble:
+      sta currentNumber   ; do currentNumber
+      jsr displayNumberDef; zjisteni segmentu
+      lda currentNumberSegments  ; nacteni segmentu
+      sta RightDisplayAdr   ; ulozeni na pravy displej                                                      
+      wait
       rts 
       
 trikratBlikniAZastav:
@@ -340,8 +397,15 @@ rezimSet:
       
       rts
 rezimStart:
-      brclr 6, PTED, rezimSet ; sprav na jsr 
-      brset 6, PTED, rezimCitani
+      brclr 6, PTED, skocNaSet 
+      brset 6, PTED, skocNaCitani
+      jmp konecTestuSkoku
+skocNaSet:
+      jsr rezimSet
+      jmp konecTestuSkoku
+skocNaCitani:
+      jsr rezimCitani
+konecTestuSkoku:            
       
       rts
 
