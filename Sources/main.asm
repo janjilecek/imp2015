@@ -19,7 +19,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  0
+CNT:  dc.w  10
 CN: ds.w 1
 compareCNT: ds.w 1
 myH: ds.b 1
@@ -33,6 +33,8 @@ currentNibbleValue: dc.b 0
 currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
+currentMode: dc.b 0
+pocetBliknuti: dc.b 3
 tempByte: ds.b 1
 tempChangingH: ds.b 1
 tempChangingX: ds.b 1
@@ -141,11 +143,25 @@ rezimStartDef:
 
 
 clockInterruptService:
-      jsr loadNibbles
+      ;jsr loadNibbles
       
       mov #RTCClockSetting, RTCSC
-      
+      lda currentMode
+      cmp #3
+      beq neblikej
+      cmp #5
+      beq modBlikaniTrikrat
+      cmp #0
+      beq neblikej
       jsr blikniAktivni 
+      jmp neblikej
+modBlikaniTrikrat:
+      com PTBD
+      com PTDD
+      
+      
+      
+neblikej:      
       rti
 
 displayIt:
@@ -280,7 +296,11 @@ ulozeniKonec:
       
       
 rezimCitani:
-      jsr rezimSetDef
+      lda #3
+      sta currentMode
+      mov #%11111111, PTBDD
+      mov #%11111111, PTDDD
+      jsr rezimSetDef ; zapnuti hodin
       lda #255
 loopNop:
       nop
@@ -320,26 +340,27 @@ dontknowCNT:
       lda #0
       cmp myH
       beq testLowerX ; zadna zmena v H, jdeme do X
-      lda #$0F
-      cmp myH
-      blo aktivniCtvrtyNibble
-aktivniTretiNibble:                  
-      lda #2
-      sta fastestChanging
-      jmp testLowerX
-aktivniCtvrtyNibble:
+      lda myH
+      cmp #$0F
+      blo aktivniTretiNibble
+aktivniCtvrtyNibble:                  
       lda #3
       sta fastestChanging
-testLowerX:
-      lda #$0F
-      cmp myX
-      blo aktivniDruhyNibble
-aktivniPrvniNibble:
-      lda #0
+      jmp konecTestovaniCitani
+aktivniTretiNibble:
+      lda #2
       sta fastestChanging
       jmp konecTestovaniCitani
+testLowerX:
+      lda myX
+      cmp #$0F
+      blo aktivniPrvniNibble
 aktivniDruhyNibble:
       lda #1
+      sta fastestChanging
+      jmp konecTestovaniCitani
+aktivniPrvniNibble:
+      lda #0
       sta fastestChanging 
 konecTestovaniCitani: 
       ; nyni zobraz na displeji
@@ -349,10 +370,6 @@ konecTestovaniCitani:
       jsr displayNumberDef; zjisteni segmentu
       lda currentNumberSegments  ; nacteni segmentu
       sta LeftDisplayAdr   ; ulozeni na levy displej                                                   
-      ;jmp konecZobrazovani
-
-      ;lda currentNumberSegments
-      ;sta RightDisplayAdr
 
       lda fastestChanging
       cmp #0 ; pokud prvni
@@ -384,9 +401,24 @@ zobrazHodnotuNibble:
       rts 
       
 trikratBlikniAZastav:
-
-  rts        
+      lda #5
+      sta currentMode
+      lda pocetBliknuti
+      cmp #0
+      beq blikaniDokonceno
+      bne jesteBuduBlikat    ; bug nekde, underflow
+blikaniDokonceno:
+      lda #3
+      sta pocetBliknuti
+      jsr rezimStop
+jesteBuduBlikat:
+      deca
+      sta pocetBliknuti
+      wait
+      rts        
 rezimSet:
+      lda #2
+      sta currentMode
       jsr rezimSetDef
       jsr zmenHodnotuAktivnihoDispleje
 
@@ -397,6 +429,8 @@ rezimSet:
       
       rts
 rezimStart:
+      lda #1
+      sta currentMode
       brclr 6, PTED, skocNaSet 
       brset 6, PTED, skocNaCitani
       jmp konecTestuSkoku
@@ -411,7 +445,9 @@ konecTestuSkoku:
 
 
 rezimStop:
-      sei
+      lda #0
+      sta currentMode
+      ;sei
       mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
       mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
       mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
@@ -419,7 +455,7 @@ rezimStop:
       mov #%00000000, PTBD; 
       mov #%00000000, PTDD; 
       mov #%00000000, PTED; 
-      mov #0, RTCSC
+      ;mov #0, RTCSC
       ldhx #0
       sthx CNT
       rts
@@ -442,7 +478,7 @@ snizCNT:
 nactiDILSwitch:
       
       brset 7, PTED, rezimStart
-      ;brclr 7, PTED, rezimStop
+      brclr 7, PTED, rezimStop
       rts
  
 mainLoop:
