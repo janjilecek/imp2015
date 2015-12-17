@@ -34,11 +34,12 @@ currentDisplay: dc.b 0
 currentNumber: dc.b 0
 currentNumberSegments: dc.b 0
 currentMode: dc.b 0
-pocetBliknuti: dc.b 3
+pocetBliknuti: dc.b 4
 tempByte: ds.b 1
 tempChangingH: ds.b 1
 tempChangingX: ds.b 1
 fastestChanging: ds.b 1
+inicializacePravy: dc.b 1
 LeftDisplayAdr: equ 2
 RightDisplayAdr: equ 6
 DILSwitchAdr: equ 8
@@ -400,29 +401,14 @@ zobrazHodnotuNibble:
       wait
       rts 
       
-trikratBlikniAZastav:
-      lda #5
-      sta currentMode
-      lda pocetBliknuti
-      cmp #0
-      beq blikaniDokonceno
-      bne jesteBuduBlikat    ; bug nekde, underflow
-blikaniDokonceno:
-      lda #3
-      sta pocetBliknuti
-      jsr rezimStop
-jesteBuduBlikat:
-      deca
-      sta pocetBliknuti
-      wait
-      rts        
+        
 rezimSet:
       lda #2
       sta currentMode
       jsr rezimSetDef
       jsr zmenHodnotuAktivnihoDispleje
 
-      
+	  
       wait
       
       
@@ -431,6 +417,7 @@ rezimSet:
 rezimStart:
       lda #1
       sta currentMode
+      
       brclr 6, PTED, skocNaSet 
       brset 6, PTED, skocNaCitani
       jmp konecTestuSkoku
@@ -450,16 +437,48 @@ rezimStop:
       ;sei
       mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
       mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
-      mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
+      ;mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
     
       mov #%00000000, PTBD; 
       mov #%00000000, PTDD; 
-      mov #%00000000, PTED; 
+      ;mov #%00000000, PTED; 
+      lda PTED
+      and #%10000000
+      sta PTED
+      
       ;mov #0, RTCSC
       ldhx #0
       sthx CNT
       rts
 
+trikratBlikniAZastav:
+      lda #5
+      sta currentMode
+      lda pocetBliknuti
+      cmp #0
+      beq blikaniDokonceno
+      bne jesteBuduBlikat    ; bug nekde, underflow
+blikaniDokonceno:
+      lda #4
+      sta pocetBliknuti
+      mov #$00, PTED
+      jsr rezimStop
+      jmp konecA
+jesteBuduBlikat:
+      ;cmp #0
+      ;beq konecA
+      deca
+      sta pocetBliknuti
+      wait
+konecA:      
+      rts
+
+nactiDILSwitch:
+      
+      brset 7, PTED, rezimStart
+      brclr 7, PTED, rezimStop
+      rts
+      
 zvysCNT:
       ldhx CNT
       cphx #$FFFF
@@ -475,11 +494,7 @@ snizCNT:
       sthx CNT  
       rts        
 
-nactiDILSwitch:
-      
-      brset 7, PTED, rezimStart
-      brclr 7, PTED, rezimStop
-      rts
+
  
 mainLoop:
             ; Insert your code here
