@@ -1,11 +1,5 @@
-;*******************************************************************
-;* This stationery serves as the framework for a user application. *
-;* For a more comprehensive program that demonstrates the more     *
-;* advanced functionality of this processor, please see the        *
-;* demonstration applications, located in the examples             *
-;* subdirectory of the "Freescale CodeWarrior for HC08" program    *
-;* directory.                                                      *
-;*******************************************************************
+; Jan Jilecek, xjilec00, originalni soubor (kostra predgenerovana)
+; Projekt Citac, RTC,  assembler HCS08
 
 ; Include derivative-specific definitions
             INCLUDE 'derivative.inc'
@@ -19,7 +13,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  10
+CNT:  dc.w  250
 CN: ds.w 1
 compareCNT: ds.w 1
 myH: ds.b 1
@@ -40,6 +34,7 @@ tempChangingH: ds.b 1
 tempChangingX: ds.b 1
 fastestChanging: ds.b 1
 inicializacePravy: dc.b 1
+stavPrepinacu: ds.b 1
 LeftDisplayAdr: equ 2
 RightDisplayAdr: equ 6
 DILSwitchAdr: equ 8
@@ -194,7 +189,7 @@ dontknowCNT:
       cmp myH
       beq testLowerX ; zadna zmena v H, jdeme do X
       lda myH
-      cmp #$0F
+      cmp #$0F	   
       blo aktivniTretiNibble
 aktivniCtvrtyNibble:                  
       lda #3
@@ -208,8 +203,13 @@ testLowerX:
       lda myX
       cmp #$0F
       blo aktivniPrvniNibble
-aktivniDruhyNibble:
-      lda #1
+aktivniDruhyNibble:	
+
+;pokud je currentNumber 7, nemeni se
+		lda #7
+		cmp currentNumber
+		beq aktivniPrvniNibble
+      lda #1      
       sta fastestChanging
       jmp konecTestovaniCitani
 aktivniPrvniNibble:
@@ -225,7 +225,7 @@ konecTestovaniCitani:
       sta LeftDisplayAdr   ; ulozeni na levy displej                                                   
 	
       lda fastestChanging
-      cmp #0 ; pokud prvni
+      cmp #0 ; pokud prvni, big endian
       beq ulozPrvniN
       cmp #1
       beq ulozDruhyN
@@ -250,17 +250,12 @@ zobrazHodnotuNibble:
       jsr displayNumberDef; zjisteni segmentu
       lda currentNumberSegments  ; nacteni segmentu
       sta RightDisplayAdr   ; ulozeni na pravy displej                                                      
-      ;wait
-      ;lda currentMode
-      ;cmp #3   ; citani
-      ;beq neblikej
+
       
 neblikej:      
       rti
 
 displayIt:
-      ;lda #0        
-      ;cmp currentDisplay
       brset 4, PTED, zobrazNaPravem            
 zobrazNaLevem:
       lda currentNumberSegments
@@ -276,7 +271,7 @@ konecZobrazovani:
 loadNibbles:
       ldhx CNT
       sthx myH
-      ;; CNT je v myH a myX
+      ;; CNT je v myH a myX, big endian
       ;; ulozeni prvniho nibble
       lda myH
       and #%11110000
@@ -413,12 +408,33 @@ rezimSet:
       lda #2
       sta currentMode
       jsr rezimSetDef
-      jsr zmenHodnotuAktivnihoDispleje
+      
+	;	lda stavPrepinacu ; testovani zmeny displeje od minuleho cyklu
+	;	eor PTED
+	;	and #%00010000
+	;	cmp #0
+	;	bne zmenenyDisplej
+		
+		
+		
+zmenenyDisplej:
 
-	  
+	;	lda stavPrepinacu
+	;	eor PTED
+	;	and #%00001111
+	;	cmp #0
+	;	bne seZmenou
+	;	jmp bezeZmeny
+
+seZmenou:		      
+      jsr zmenHodnotuAktivnihoDispleje
+bezeZmeny:	  
+      lda #2
+      sta currentMode	  
       wait
       
-      
+      lda PTED
+	  sta stavPrepinacu
       
       rts
 rezimStart:
@@ -444,13 +460,11 @@ rezimStop:
       ;sei
       mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
       mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
-      ;mov #%11111111, PTEDD; ; data direction output pro port E, DILSwitch
     
       mov #%00000000, PTBD; 
       mov #%00000000, PTDD; 
-      ;mov #%00000000, PTED; 
       lda PTED
-      and #%10000000
+      and #%10000000  ; kontrola pouze prvniho
       sta PTED
       
       ;mov #0, RTCSC
@@ -464,7 +478,7 @@ trikratBlikniAZastav:
       lda pocetBliknuti
       cmp #0
       beq blikaniDokonceno
-      bne jesteBuduBlikat    ; bug nekde, underflow
+      bne jesteBuduBlikat  
 blikaniDokonceno:
       lda #4
       sta pocetBliknuti
@@ -472,8 +486,6 @@ blikaniDokonceno:
       jsr rezimStop
       jmp konecA
 jesteBuduBlikat:
-      ;cmp #0
-      ;beq konecA
       deca
       sta pocetBliknuti
       wait
@@ -488,14 +500,14 @@ nactiDILSwitch:
       
 zvysCNT:
       ldhx CNT
-      cphx #$FFFF
+      cphx #$FFFF	  ; pokud jsme dosahli hranice
       beq trikratBlikniAZastav
       aix #1
       sthx CNT
       rts
 snizCNT:
       ldhx CNT
-      cphx #$0000
+      cphx #$0000	 ; hranice
       beq trikratBlikniAZastav
       aix #-1
       sthx CNT  
@@ -504,13 +516,8 @@ snizCNT:
 
  
 mainLoop:
-            ; Insert your code here
       NOP     
-      ;jsr loadNibbles
-      ;jsr displayTest
       jsr nactiDILSwitch            
-;      wait
-      
       ;feed_watchdog
       BRA    mainLoop
            
@@ -654,7 +661,7 @@ spurious:   ; telo obsluhy pro neobsluhovana preruseni
       rti
 
 ;**************************************************************
-;* V. tabulka vektoru preruseni                               *
+;* tabulka vektoru preruseni                               *
 ;**************************************************************
 
 
