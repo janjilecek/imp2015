@@ -24,10 +24,10 @@ CN: ds.w 1
 compareCNT: ds.w 1
 myH: ds.b 1
 myX: ds.b 1
-bPrvniNibble: ds.b 1
-bDruhyNibble: ds.b 1
-bTretiNibble: ds.b 1
-bCtvrtyNibble: ds.b 1
+CNTNbPrvniNibble: ds.b 1
+CNTNbDruhyNibble: ds.b 1
+CNTNbTretiNibble: ds.b 1
+CNTNbCtvrtyNibble: ds.b 1
 currentNibble: dc.b 0
 currentNibbleValue: dc.b 0
 currentDisplay: dc.b 0
@@ -104,14 +104,14 @@ _Startup:
 ; konec inicializacni casti
 ; blok doprednych deklaraci
 displayTest:
-        lda bTretiNibble
+        lda CNTNbTretiNibble
       sta currentNumber                                                                         
       jsr displayNumber 
       lda #0 ; zvol levy
       sta currentDisplay                                                      
           jsr displayIt             
       
-          lda bCtvrtyNibble
+          lda CNTNbCtvrtyNibble
       sta currentNumber                                                                         
       jsr displayNumber
       lda #1 ; zvol pravy
@@ -148,19 +148,112 @@ clockInterruptService:
       
       mov #RTCClockSetting, RTCSC
       lda currentMode
-      cmp #3
-      beq neblikej
+      cmp #3   ; citani
+	  beq modJeCitani
       cmp #5
       beq modBlikaniTrikrat
       cmp #0
-      beq neblikej
+      beq middleSkokNeblikej
       jsr blikniAktivni 
+middleSkokNeblikej:      
       jmp neblikej
 modBlikaniTrikrat:
       com PTBD
       com PTDD
-      
-      
+	  jmp neblikej
+modJeCitani:	        
+		brset 5, PTED, zvyseniCNT
+      brclr 5, PTED, snizeniCNT
+
+zvyseniCNT:
+      jsr zvysCNT
+      jmp dontknowCNT
+snizeniCNT:
+      jsr snizCNT
+dontknowCNT:
+       lda currentMode
+      cmp #5
+      beq middleSkokNeblikej
+      ldhx CNT
+      sthx myH
+      ; mam myH horni, myX dolni
+      ldhx compareCNT
+      sthx tempChangingH
+      ; stare hodnoty CNT v tempChangingH, tempChangingX
+      lda myH
+      eor tempChangingH
+      sta myH
+      lda myX
+      eor tempChangingX
+      sta myX
+      ldhx myH ; do HX uloz XOR verzi
+      sthx compareCNT ; zazalohuj
+      ; cmp myH, if > F, 4.n, mensi je 3. n
+      ; cmp myX, if > F, 2.n, mensi je 1. n
+      lda #0
+      cmp myH
+      beq testLowerX ; zadna zmena v H, jdeme do X
+      lda myH
+      cmp #$0F
+      blo aktivniTretiNibble
+aktivniCtvrtyNibble:                  
+      lda #3
+      sta fastestChanging
+      jmp konecTestovaniCitani
+aktivniTretiNibble:
+      lda #2
+      sta fastestChanging
+      jmp konecTestovaniCitani
+testLowerX:
+      lda myX
+      cmp #$0F
+      blo aktivniPrvniNibble
+aktivniDruhyNibble:
+      lda #1
+      sta fastestChanging
+      jmp konecTestovaniCitani
+aktivniPrvniNibble:
+      lda #0
+      sta fastestChanging 
+konecTestovaniCitani: 
+      ; nyni zobraz na displeji
+      jsr loadNibbles
+      lda fastestChanging ; nacteni nibble indexu 
+      sta currentNumber   ; do currentNumber
+      jsr displayNumberDef; zjisteni segmentu
+      lda currentNumberSegments  ; nacteni segmentu
+      sta LeftDisplayAdr   ; ulozeni na levy displej                                                   
+	
+      lda fastestChanging
+      cmp #0 ; pokud prvni
+      beq ulozPrvniN
+      cmp #1
+      beq ulozDruhyN
+      cmp #2
+      beq ulozTretiN
+      cmp #3
+      beq ulozCtvrtyN
+      jmp ulozPrvniN ; osetreni
+ulozPrvniN:
+      lda CNTNbCtvrtyNibble
+      jmp zobrazHodnotuNibble
+ulozDruhyN:
+      lda CNTNbTretiNibble
+      jmp zobrazHodnotuNibble
+ulozTretiN:
+      lda CNTNbDruhyNibble
+      jmp zobrazHodnotuNibble
+ulozCtvrtyN:      
+      lda CNTNbPrvniNibble
+zobrazHodnotuNibble:
+      sta currentNumber   ; do currentNumber
+      jsr displayNumberDef; zjisteni segmentu
+      lda currentNumberSegments  ; nacteni segmentu
+      sta RightDisplayAdr   ; ulozeni na pravy displej                                                      
+      ;wait
+      ;lda currentMode
+      ;cmp #3   ; citani
+      ;beq neblikej
       
 neblikej:      
       rti
@@ -191,11 +284,11 @@ loadNibbles:
       lsra
       lsra
       lsra
-      sta bPrvniNibble
+      sta CNTNbPrvniNibble
       ;; ulozeni druheho nibble
       lda myH
       and #%00001111
-      sta bDruhyNibble
+      sta CNTNbDruhyNibble
       ;; ulozeni tretiho nibble
       lda myX       
       and #%11110000
@@ -203,11 +296,11 @@ loadNibbles:
       lsra
       lsra
       lsra
-      sta bTretiNibble
+      sta CNTNbTretiNibble
       ;; ulozeni ctvrteho nibble                 
       lda myX
       and #%00001111
-      sta bCtvrtyNibble
+      sta CNTNbCtvrtyNibble
       
       rts
 
@@ -244,13 +337,13 @@ konecPrace:
       ldhx CNT
       sthx myH
       lda currentNibble
-      cmp #0
-      beq ulozeniPrvniNibble
-      cmp #1
-      beq ulozeniDruhyNibble
-      cmp #2
-      beq ulozeniTretiNibble
       cmp #3
+      beq ulozeniPrvniNibble
+      cmp #2
+      beq ulozeniDruhyNibble
+      cmp #1
+      beq ulozeniTretiNibble
+      cmp #0
       beq ulozeniCtvrtyNibble
       jmp ulozeniKonec
 ulozeniPrvniNibble:
@@ -311,94 +404,8 @@ loopNop:
       
       ldhx CNT
       sthx compareCNT
+	  wait
 
-      brset 5, PTED, zvyseniCNT
-      brclr 5, PTED, snizeniCNT
-
-zvyseniCNT:
-      jsr zvysCNT
-      jmp dontknowCNT
-snizeniCNT:
-      jsr snizCNT
-dontknowCNT:
-      
-      ldhx CNT
-      sthx myH
-      ; mam myH horni, myX dolni
-      ldhx compareCNT
-      sthx tempChangingH
-      ; stare hodnoty CNT v tempChangingH, tempChangingX
-      lda myH
-      eor tempChangingH
-      sta myH
-      lda myX
-      eor tempChangingX
-      sta myX
-      ldhx myH ; do HX uloz XOR verzi
-      sthx compareCNT ; zazalohuj
-      ; cmp myH, if > F, 4.n, mensi je 3. n
-      ; cmp myX, if > F, 2.n, mensi je 1. n
-      lda #0
-      cmp myH
-      beq testLowerX ; zadna zmena v H, jdeme do X
-      lda myH
-      cmp #$0F
-      blo aktivniTretiNibble
-aktivniCtvrtyNibble:                  
-      lda #3
-      sta fastestChanging
-      jmp konecTestovaniCitani
-aktivniTretiNibble:
-      lda #2
-      sta fastestChanging
-      jmp konecTestovaniCitani
-testLowerX:
-      lda myX
-      cmp #$0F
-      blo aktivniPrvniNibble
-aktivniDruhyNibble:
-      lda #1
-      sta fastestChanging
-      jmp konecTestovaniCitani
-aktivniPrvniNibble:
-      lda #0
-      sta fastestChanging 
-konecTestovaniCitani: 
-      ; nyni zobraz na displeji
-      jsr loadNibbles
-      lda fastestChanging ; nacteni nibble indexu 
-      sta currentNumber   ; do currentNumber
-      jsr displayNumberDef; zjisteni segmentu
-      lda currentNumberSegments  ; nacteni segmentu
-      sta LeftDisplayAdr   ; ulozeni na levy displej                                                   
-
-      lda fastestChanging
-      cmp #0 ; pokud prvni
-      beq ulozPrvniN
-      cmp #1
-      beq ulozDruhyN
-      cmp #2
-      beq ulozTretiN
-      cmp #3
-      beq ulozCtvrtyN
-      jmp ulozPrvniN ; osetreni
-ulozPrvniN:
-      lda bCtvrtyNibble
-      jmp zobrazHodnotuNibble
-ulozDruhyN:
-      lda bTretiNibble
-      jmp zobrazHodnotuNibble
-ulozTretiN:
-      lda bDruhyNibble
-      jmp zobrazHodnotuNibble
-ulozCtvrtyN:      
-      lda bPrvniNibble
-zobrazHodnotuNibble:
-      sta currentNumber   ; do currentNumber
-      jsr displayNumberDef; zjisteni segmentu
-      lda currentNumberSegments  ; nacteni segmentu
-      sta RightDisplayAdr   ; ulozeni na pravy displej                                                      
-      wait
       rts 
       
         
