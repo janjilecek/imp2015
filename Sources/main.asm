@@ -13,7 +13,7 @@
 ; variable/data section
 ;
             ORG    RAMStart         ; Insert your data definition here
-CNT:  dc.w  250
+CNT:  dc.w  1
 CN: ds.w 1
 compareCNT: ds.w 1
 myH: ds.b 1
@@ -79,18 +79,9 @@ _Startup:
       mov #%00000000, PTDD; 
       mov #%00000000, PTED; 
       
-      jsr loadNibbles
-      
+      jsr loadNibbles      
       jsr displayTest      
-            
-         
-      
-      lda #2
-      ;sta RTCLKS ; TODO: pridat preddelickove bity RTCLKS; str 216
-      ; clks na 0b00, rtcps na 0b1000
-    
-      ;mov #%00, RTCSC_RTCLKS0
-  
+
       cli  ;povol preruseni
       ;sei  
         
@@ -119,33 +110,25 @@ displayNumber:
       rts
 ; rezim set         
 rezimSetDef:
-      mov #RTCClockSetting, RTCSC
+      mov #RTCClockSetting, RTCSC ; nastaveni hodin
     
       rts
       
-; rezim Stop      
-rezimStopDef:
-      
-      rts
 
 ; rezim Start
 rezimStartDef:
-      jsr rezimStart
-    
+      jsr rezimStart  
       rts      
 ; konec bloku doprednych deklaraci
 ; odtud definice            
 
 
-
 clockInterruptService:
-      ;jsr loadNibbles
-      
       mov #RTCClockSetting, RTCSC
       lda currentMode
       cmp #3   ; citani
 	  beq modJeCitani
-      cmp #5
+      cmp #5   ; blikani a konec
       beq modBlikaniTrikrat
       cmp #0
       beq middleSkokNeblikej
@@ -408,25 +391,7 @@ rezimSet:
       lda #2
       sta currentMode
       jsr rezimSetDef
-      
-	;	lda stavPrepinacu ; testovani zmeny displeje od minuleho cyklu
-	;	eor PTED
-	;	and #%00010000
-	;	cmp #0
-	;	bne zmenenyDisplej
-		
-		
-		
-zmenenyDisplej:
-
-	;	lda stavPrepinacu
-	;	eor PTED
-	;	and #%00001111
-	;	cmp #0
-	;	bne seZmenou
-	;	jmp bezeZmeny
-
-seZmenou:		      
+      		      
       jsr zmenHodnotuAktivnihoDispleje
 bezeZmeny:	  
       lda #2
@@ -457,7 +422,7 @@ konecTestuSkoku:
 rezimStop:
       lda #0
       sta currentMode
-      ;sei
+
       mov #%11111111, PTBDD; ; data direction output pro port B, Seg7 1
       mov #%11111111, PTDDD; ; data direction output pro port D, Seg7 2
     
@@ -467,7 +432,6 @@ rezimStop:
       and #%10000000  ; kontrola pouze prvniho
       sta PTED
       
-      ;mov #0, RTCSC
       ldhx #0
       sthx CNT
       rts
